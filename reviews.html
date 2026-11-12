@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نظرات مشتریان | امداد خودرو آزادراه ساوه همدان</title>
+<style>
+:root{--bg:#07111d;--card:#0f1d30;--line:#1e3050;--txt:#e6edf7;--muted:#8aa0bd;--or:#ff9100;--gr:#22c55e;--red:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:Tahoma,Vazirmatn,sans-serif;font-size:17px;line-height:1.9}
+.wrap{max-width:720px;margin:0 auto;padding:16px}
+.top{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.btn{display:inline-block;padding:12px 18px;border-radius:14px;text-decoration:none;color:#111;background:linear-gradient(90deg,#ff7a00,#ffb300);font:inherit;font-weight:700;border:0;cursor:pointer}
+.btn.g{background:var(--gr);color:#fff}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+h1{font-size:26px;margin:8px 0 4px}
+.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+label{display:block;color:var(--muted);font-size:15px;margin:10px 0 4px}
+input,select,textarea{width:100%;background:#0a1626;color:var(--txt);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+.msg{color:var(--red);min-height:1.6em;font-size:15px;margin:8px 0}
+.meta{color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+.meta b{color:var(--txt)}
+.stars{color:#ffb300;letter-spacing:2px}
+.tag{background:#15294a;border-radius:999px;padding:2px 10px}
+.text{white-space:pre-wrap;margin:8px 0 10px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.vb{background:#0a1626;border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+.vb.on{border-color:var(--or);color:var(--or)}
+.reply{margin:12px 0 0 14px;padding:4px 0 0 12px;border-right:2px solid var(--line)}
+.rf{margin-top:10px}
+.rf .btn{margin-top:8px}
+.empty{color:var(--muted);text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="btn" href="tel:+989038896003">📞 تماس فوری</a>
+    <a class="btn g" href="https://emdad-khodro-saveh-hamedan.netlify.app/#request">درخواست امداد</a>
+    <a class="btn ghost" href="https://emdad-khodro-saveh-hamedan.netlify.app/">بازگشت به سایت</a>
+  </div>
+
+  <h1>نظرات مشتریان</h1>
+  <p class="sub">اگه از خدمات ما استفاده کردی، تجربه‌ت رو برای بقیه بنویس.</p>
+
+  <form class="card" id="f">
+    <label for="n">نام (اختیاری)</label>
+    <input id="n" maxlength="40" placeholder="مثلاً علی">
+    <label for="s">نوع خدمت</label>
+    <select id="s"></select>
+    <label for="r">امتیاز</label>
+    <select id="r">
+      <option value="5">۵ - عالی</option>
+      <option value="4">۴ - خوب</option>
+      <option value="3">۳ - متوسط</option>
+      <option value="2">۲ - ضعیف</option>
+      <option value="1">۱ - خیلی بد</option>
+    </select>
+    <label for="t">نظر شما</label>
+    <textarea id="t" maxlength="600" required placeholder="تجربه‌ت از امداد خودرو رو بنویس..."></textarea>
+    <p class="msg" id="err"></p>
+    <button class="btn" type="submit">ثبت نظر</button>
+  </form>
+
+  <div id="list"><p class="empty">در حال بارگذاری نظرات...</p></div>
+</div>
+
+<script>
+const API = "/api/reviews";
+const SERVICES = ["خودروبر کفی", "یدک‌کش", "مکانیک سیار", "امداد باتری", "پنچرگیری", "سوخت‌رسانی", "کلیدسازی سیار", "امداد جاده‌ای", "سایر"];
+let voter = localStorage.getItem("voter");
+if (!voter) {
+  voter = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  localStorage.setItem("voter", voter);
+}
+let reviews = [];
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+};
+const fmt = (d) => new Date(d).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" });
+
+SERVICES.forEach((s) => $("s").append(new Option(s, s)));
+
+async function send(body) {
+  $("err").textContent = "";
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...body, voter }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    reviews = data.reviews;
+    render();
+    return true;
+  } catch {
+    $("err").textContent = "ثبت نشد. اتصال رو بررسی کن و دوباره تلاش کن.";
+    return false;
+  }
+}
+
+async function load() {
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error();
+    reviews = (await res.json()).reviews || [];
+    render();
+  } catch {
+    $("list").replaceChildren(el("p", "empty", "نظرات الان در دسترس نیست."));
+  }
+}
+
+function voteBtn(label, arr, onClick) {
+  const b = el("button", "vb" + (arr.includes(voter) ? " on" : ""), label + " " + arr.length);
+  b.onclick = onClick;
+  return b;
+}
+
+function openReply(box, reviewId) {
+  if (box.querySelector(".rf")) return;
+  const f = el("form", "rf");
+  const n = el("input");
+  n.placeholder = "نام (اختیاری)";
+  n.maxLength = 40;
+  const t = el("textarea");
+  t.placeholder = "پاسخ شما...";
+  t.maxLength = 400;
+  t.required = true;
+  const b = el("button", "btn", "ارسال پاسخ");
+  b.type = "submit";
+  f.append(n, t, b);
+  f.onsubmit = (e) => {
+    e.preventDefault();
+    if (t.value.trim()) send({ action: "reply", id: reviewId, name: n.value, text: t.value.trim() });
+  };
+  box.append(f);
+}
+
+function card(item, reviewId) {
+  const isReply = reviewId !== undefined;
+  const box = el("div", isReply ? "reply" : "card");
+  const meta = el("div", "meta");
+  meta.append(el("b", "", item.name || "مهمان"));
+  if (!isReply) {
+    meta.append(el("span", "stars", "★".repeat(item.rating) + "☆".repeat(5 - item.rating)), el("span", "tag", item.service));
+  }
+  meta.append(el("span", "", fmt(item.date)));
+  const target = isReply ? { id: reviewId, replyId: item.id } : { id: item.id };
+  const acts = el("div", "acts");
+  acts.append(
+    voteBtn("👍", item.likes, () => send({ action: "vote", ...target, value: "like" })),
+    voteBtn("👎", item.dislikes, () => send({ action: "vote", ...target, value: "dislike" }))
+  );
+  if (!isReply) {
+    const rb = el("button", "vb", "پاسخ");
+    rb.onclick = () => openReply(box, item.id);
+    acts.append(rb);
+  }
+  box.append(meta, el("div", "text", item.text), acts);
+  if (!isReply) (item.replies || []).forEach((rp) => box.append(card(rp, item.id)));
+  return box;
+}
+
+function render() {
+  const list = $("list");
+  list.replaceChildren();
+  if (!reviews.length) {
+    list.append(el("p", "empty", "هنوز نظری ثبت نشده. اولین نفر باش!"));
+    return;
+  }
+  reviews.forEach((r) => list.append(card(r)));
+}
+
+$("f").onsubmit = async (e) => {
+  e.preventDefault();
+  const ok = await send({
+    action: "add",
+    name: $("n").value,
+    service: $("s").value,
+    rating: Number($("r").value),
+    text: $("t").value.trim(),
+  });
+  if (ok) $("t").value = "";
+};
+
+load();
+</script>
+</body>
+</html>
